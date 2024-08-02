@@ -15,13 +15,13 @@ var db *gorm.DB
 
 func setupDatabase() {
 	var err error
-	// Configura la conexión con MySQL
-	dsn := "sa:Mondongo@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
+
+	dsn := "sa:Mondongo@tcp(127.0.0.1:3306)/ChallengeAPI?charset=utf8mb4&parseTime=True&loc=Local"
 	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)
 	}
-	// Ejecuta tus scripts SQL para crear tablas
+
 	err = runMigrationScript()
 	if err != nil {
 		log.Fatalf("Error running migration script: %v", err)
@@ -33,11 +33,13 @@ func runMigrationScript() error {
 	if err != nil {
 		return err
 	}
-	// Ejecuta el script SQL
+
 	return db.Exec(string(script)).Error
 }
 
 func main() {
+	setupDatabase()
+
 	r := gin.Default()
 
 	r.GET("/ping", func(c *gin.Context) {

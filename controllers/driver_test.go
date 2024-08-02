@@ -34,8 +34,8 @@ func TestRegisterDriver(t *testing.T) {
 
 	jsonStr := []byte(`{
         "id": "1",
-        "name": "John Doe",
-        "username": "johndoe",
+        "name": "Rodrigo",
+        "username": "Serpentini",
         "password": "password",
         "is_on_trip": false
     }`)

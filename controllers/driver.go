@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type Driver struct {
@@ -17,20 +18,7 @@ type Driver struct {
 	IsOnTrip bool   `json:"is_on_trip"`
 }
 
-var jwtKey = []byte("my_secret_key")
-
-type Credentials struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type Claims struct {
-	Username string `json:"username"`
-	Role     string `json:"role"`
-	jwt.StandardClaims
-}
-
-var drivers = []Driver{}
+var db *gorm.DB
 
 func RegisterDriver(c *gin.Context) {
 	var newDriver Driver
@@ -39,7 +27,10 @@ func RegisterDriver(c *gin.Context) {
 		return
 	}
 
-	drivers = append(drivers, newDriver)
+	if err := db.Create(&newDriver).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not register driver"})
+		return
+	}
 
 	expirationTime := time.Now().Add(5 * time.Minute)
 	claims := &Claims{
@@ -80,68 +71,34 @@ func GetDriversWithPagination(c *gin.Context) {
 	}
 
 	start := (page - 1) * size
-	end := start + size
 
-	if start >= len(drivers) {
-		c.JSON(http.StatusOK, gin.H{"drivers": []Driver{}})
+	var drivers []Driver
+	result := db.Offset(start).Limit(size).Find(&drivers)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching drivers"})
 		return
 	}
 
-	if end > len(drivers) {
-		end = len(drivers)
-	}
-
-	paginatedDrivers := drivers[start:end]
-	c.JSON(http.StatusOK, gin.H{"drivers": paginatedDrivers})
+	c.JSON(http.StatusOK, gin.H{"drivers": drivers})
 }
 
 func GetAvailableDrivers(c *gin.Context) {
-	availableDrivers := []Driver{}
-	for _, driver := range drivers {
-		if !driver.IsOnTrip {
-			availableDrivers = append(availableDrivers, driver)
-		}
+	var availableDrivers []Driver
+	result := db.Where("is_on_trip = ?", false).Find(&availableDrivers)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching available drivers"})
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"drivers": availableDrivers})
 }
 
 func GetDriverProfile(c *gin.Context) {
 	userId := c.MustGet("user_id").(string)
-	profile := map[string]string{"user_id": userId, "name": "John Doe", "status": "Active"}
-	c.JSON(http.StatusOK, gin.H{"profile": profile})
-}
-func Login(c *gin.Context) {
-	var creds Credentials
-	if err := c.BindJSON(&creds); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+	var driver Driver
+	result := db.First(&driver, "id = ?", userId)
+	if result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Driver not found"})
 		return
 	}
-
-	var role string
-	if creds.Username == "admin" && creds.Password == "password" {
-		role = "admin"
-	} else if creds.Username == "driver" && creds.Password == "password" {
-		role = "driver"
-	} else {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
-		return
-	}
-
-	expirationTime := time.Now().Add(5 * time.Minute)
-	claims := &Claims{
-		Username: creds.Username,
-		Role:     role,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expirationTime.Unix(),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtKey)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create token"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+	c.JSON(http.StatusOK, gin.H{"profile": driver})
 }

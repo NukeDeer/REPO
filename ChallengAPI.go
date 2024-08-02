@@ -3,9 +3,39 @@ package main
 import (
 	"REPO/ChallengerAPI/middleware"
 	"REPO/controllers"
+	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
+
+var db *gorm.DB
+
+func setupDatabase() {
+	var err error
+	// Configura la conexión con MySQL
+	dsn := "sa:Mondongo@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("Error connecting to database: %v", err)
+	}
+	// Ejecuta tus scripts SQL para crear tablas
+	err = runMigrationScript()
+	if err != nil {
+		log.Fatalf("Error running migration script: %v", err)
+	}
+}
+
+func runMigrationScript() error {
+	script, err := os.ReadFile("Challenger.sql")
+	if err != nil {
+		return err
+	}
+	// Ejecuta el script SQL
+	return db.Exec(string(script)).Error
+}
 
 func main() {
 	r := gin.Default()

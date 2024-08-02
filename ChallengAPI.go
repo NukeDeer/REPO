@@ -1,6 +1,7 @@
 package main
 
 import (
+	"REPO/ChallengerAPI/middleware"
 	"REPO/controllers"
 
 	"github.com/gin-gonic/gin"
@@ -9,13 +10,19 @@ import (
 func main() {
 	r := gin.Default()
 
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "pong",
-		})
-	})
+	r.POST("/login", controllers.Login)
 
-	r.GET("/drivers", controllers.GetDrivers)
+	admin := r.Group("/admin")
+	admin.Use(middleware.AuthMiddleware("admin"))
+	{
+		admin.GET("/drivers", controllers.GetDrivers)
+	}
+
+	driver := r.Group("/driver")
+	driver.Use(middleware.AuthMiddleware("driver"))
+	{
+		driver.GET("/profile", controllers.GetDriverProfile)
+	}
 
 	r.Run()
 }
